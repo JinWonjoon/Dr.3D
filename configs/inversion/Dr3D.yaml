@@ -1,0 +1,46 @@
+from_args:
+  dataset_name: caricatures
+  network_name: Dr3D_Caricature
+  outdir: ./logs/invert_samples
+  network_dir: /data/private/Dr3D/Dr3D/logs/Dr3D_final/Caricature
+  network_pkl: network-snapshot-000403.pkl
+  target_image_path: /data/private/Dr3D/Dr3D/target_images/
+  reload_modules: True
+  shapes: True
+  shape_res: 512
+
+coach_kwargs:
+  inverter_kwargs:
+    lpips_type: vgg
+    max_images_to_invert: 10
+    max_pti_steps: 10
+    use_ball_holder: True
+    use_locality_regularization: True
+    locality_regularization_interval: 1
+    training_step: 1
+    pti_learning_rate: 3.0e-04
+  proj_kwargs:
+    first_inv_steps: 10
+    first_inv_lr: 5.0e-03
+  reg_kwargs:
+    regularizer_alpha: 30
+    regularizer_l2_lambda: 0.1
+    regularizer_lpips_lambda: 0.1
+    latent_ball_num_of_samples: 1
+    pt_l2_lambda: 1.5
+    pt_lpips_lambda: 1
+    cam_pose_dicts:
+      pitch:
+        mode: gaussian
+        mean: ">>> pi/2"
+        std: 0.260
+      yaw:
+        mode: gaussian
+        mean: ">>> pi/2"
+        std: 0.599 
+      roll:
+        mode: gaussian
+        mean: 0
+        std: 0.054
+
+

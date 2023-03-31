@@ -1,0 +1,7 @@
+gen_videos.py
+core.*
+*.pyc
+logs
+ckpts
+pretrained
+target_images

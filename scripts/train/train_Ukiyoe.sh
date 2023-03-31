@@ -1,0 +1,1 @@
+python train.py --cfg_path ./configs/dr3d/Ukiyoe.yaml

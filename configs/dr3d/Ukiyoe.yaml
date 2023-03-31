@@ -1,0 +1,256 @@
+num_gpus: 4 #Number of GPUs to use
+batch_size: 64  #32  #Total batch size
+batch_gpu: ">>> self['batch_size'] // self['num_gpus']" # batch_size // num_gpus
+ema_kimg: ">>> self['batch_size'] * 10 / 32"  #10.0  #batch_size * 10 / 32
+random_seed: 0
+total_kimg: 2000 #Total training duration
+kimg_per_tick: 4  #How often to print progress
+image_snapshot_ticks: 50  #How often to save snapshots
+network_snapshot_ticks: 50
+
+from_args:
+  run_Dr3D: True
+  blur_fade_kimg: 200.0
+  dataset_name: Ukiyoe
+  data:
+  - ../datasets/ukiyoe
+  gen_pose_cond: false #If true, enable generator pose conditioning
+  gpc_reg_prob: 0.5 #Strength of swapping regularization. None means no generator pose conditioning, i.e. condition with zeros
+  outdir: "%>> ./logs/Dr3D/%(from_args.dataset_name)s"
+  dry_run: false
+  glr: null #G learning rate
+  cfg: ffhq #Base configuration
+  density_reg: 0.25 #Density regularization strength.
+  density_reg_every: 4.0  #lazy density reg ==> G_reg_interval if density_reg > 0
+  resume: ./ckpts/EG3D_FFHQ_ckpt.pth 
+  resume_partial_copy: False
+  resume_blur: false  #Enable to blur even on resume
+  g_num_fp16_res: 0 #Number of fp16 layers in generator
+  d_num_fp16_res: 3 #Number of fp16 layers in discriminator
+  cbase: 32768  #Capacity multiplier (min=1, int)
+  cmax: 512     #'Max. feature maps'
+  img_resolution: 256
+  img_resolution_mid: 64
+  gamma: 1.0
+  sr_module_class_name: src.training.superresolutions.superresolution.SuperresolutionUpUp
+  posenet_path: ./ckpts/hopenet_ckpt.pth
+  augment_per_data:
+    0: ada
+  freeze_generator: True # freezeG. (default: false)
+  Nofreeze_keywords: # module names for optimization (default: empty list [])
+  - b32
+  - b64
+  - b128
+  - b256
+  - superresolution
+  - decoder
+
+wandb_cfg:
+  wandb_entity: null # your wandb profile entity.
+  wandb_online: False # if you don't want to sync your logs online, just use 'False', otherwise 'True'
+  wandb_id: null
+  wandb_name: Dr3D_Ukiyoe
+  wandb_project: Dr3D
+  wandb_num_fixed_img: 4 #">>> len(self['from_args']['data']) * 2"
+  wandb_num_rnd_img: 4 #">>> len(self['from_args']['data']) * 2"
+
+training_set_kwargs:
+  class_name: src.training.datasets.imagedataset.ImageDataset
+  hparams:
+    path: ">>> self['from_args']['data']"
+    resolution: ">>> self['from_args']['img_resolution']"
+    num_img_channel : 3
+    label_dim: 25
+    dataset_name: ">>> self['from_args']['dataset_name']"
+    random_seed: ">>> self['random_seed']"
+    use_domain: false
+
+### Models
+G_kwargs:
+  class_name: src.training.triplanes.triplane_Dr3D.TriPlaneGeneratorDr3D
+  z_dim: 512
+  c_dim: ">>> self['training_set_kwargs']['hparams']['label_dim']"
+  w_dim: 512
+  img_resolution: ">>> self['training_set_kwargs']['hparams']['resolution']"
+  img_channels: ">>> self['training_set_kwargs']['hparams']['num_img_channel']"
+  sr_num_fp16_res: 4  #Number of fp16 layers in superresolution
+  additional_kwargs:
+    renderer:
+      class_name: src.training.volumetric_rendering.renderer.ImportanceRenderer
+    ray_sampler:
+      class_name: src.training.volumetric_rendering.ray_sampler.RaySampler
+    rot_angle: ">>> 3*pi/12"
+    rot_angle_gap: ">>> pi/12"
+    deform_kwargs:
+      class_name: src.training.networks.networks_deform.DeformNetwork
+      z_dim: 256
+      w_dim: 256
+      c_dim: 0
+      deform_res:
+      - 8
+      - 16
+      - 32
+      mapping_kwargs:
+        class_name: src.training.networks.networks_stylegan2.MappingNetwork
+        num_layers: 4 #Mapping network depth for deformation network
+        w_dim: ">>> self['G_kwargs']['additional_kwargs']['deform_kwargs']['w_dim']"
+        z_dim: ">>> self['G_kwargs']['additional_kwargs']['deform_kwargs']['z_dim']"
+        embed_features: ">>> self['G_kwargs']['additional_kwargs']['deform_kwargs']['w_dim']"
+  rendering_kwargs:
+    avg_camera_pivot: # used only in the visualizer to control center of camera rotation.
+    - 0
+    - 0
+    - 0
+    avg_camera_radius: 2.7  # used only in the visualizer to specify camera orbit radius.
+    box_warp: 1 # the side-length of the bounding box spanned by the tri-planes; box_warp=1 means [-0.5, -0.5, -0.5] -> [0.5, 0.5, 0.5].
+    #c_gen_conditioning_zero: false ## if true, fill generator pose conditioning label with dummy zero vector
+    c_scale: 1.0  # mutliplier for generator pose conditioning label
+    clamp_mode: softplus
+    decoder_lr_mul: 1.0 # learning rate multiplier for decoder
+    density_reg: ">>> self['from_args']['density_reg']" # strength of density regularization
+    density_reg_p_dist: 0.004 # distance at which to sample perturbed points for density regularization
+    depth_resolution: 48  # number of uniform samples to take per ray.
+    depth_resolution_importance: 48 # number of importance samples to take per ray.
+    disparity_space_sampling: false
+    #gpc_reg_prob: 0.5
+    image_resolution: ">>> self['from_args']['img_resolution']" #training_set_kwargs.resolution
+    ray_end: 3.3  # far point along each ray to stop taking samples.
+    ray_start: 2.25 # near point along each ray to start taking samples.
+    reg_type: l1  # for experimenting with variations on density regularization
+    sr_antialias: true
+    #superresolution_module: training.superresolution.SuperresolutionHybrid8XDC
+    superresolution_noise_mode: none  # [random or none], whether to inject pixel noise into super-resolution layers
+    white_back: false
+  sr_kwargs:
+    class_name: ">>> self['from_args']['sr_module_class_name']"
+    channels: 32
+    img_resolution: ">>> self['G_kwargs']['img_resolution']"
+    sr_num_fp16_res: ">>> self['G_kwargs']['sr_num_fp16_res']"
+    sr_antialias: ">>> self['G_kwargs']['rendering_kwargs']['sr_antialias']"
+    channel_base: 32768 #Capacity multiplier (min=1, int)
+    channel_max: 512  #'Max. feature maps'
+    fused_modconv_default: inference_only
+  backbone_kwargs:
+    class_name: src.training.networks.networks_stylegan2_deform.GeneratorDeform
+    z_dim: ">>> self['G_kwargs']['z_dim']"
+    w_dim: ">>> self['G_kwargs']['w_dim']"
+    img_resolution: 256
+    img_channels: ">>> 32 * 3"
+    mapping_kwargs:
+      class_name: src.training.networks.networks_stylegan2.MappingNetwork
+      num_layers: 8 #Mapping network depth
+      w_dim: ">>> self['G_kwargs']['w_dim']"
+      z_dim: ">>> self['G_kwargs']['z_dim']"
+      embed_features: ">>> self['G_kwargs']['w_dim']"
+    synthesis_kwargs:
+      class_name: src.training.networks.networks_stylegan2_deform.SynthesisNetworkDeform
+      w_dim: ">>> self['G_kwargs']['w_dim']"
+      img_resolution: ">>> self['G_kwargs']['backbone_kwargs']['img_resolution']"
+      img_channels: ">>> self['G_kwargs']['backbone_kwargs']['img_channels']"
+      channel_base: ">>> self['from_args']['cbase']"
+      channel_max: ">>> self['from_args']['cmax']"
+      conv_clamp: null
+      fused_modconv_default: inference_only # Speed up training by using regular convolutions instead of grouped convolutions.
+      num_fp16_res: ">>> self['from_args']['g_num_fp16_res']"
+  decoder_kwargs:
+    class_name: src.training.triplanes.decoders.OSGDecoder
+    n_features: 32
+    options:
+      decoder_lr_mul: ">>> self['G_kwargs']['rendering_kwargs']['decoder_lr_mul']"
+      decoder_output_dim: 32
+
+D_kwargs:
+  class_name: src.training.discriminators.dual_discriminatorv1.DualDiscriminatorV1
+  c_dim: ">>> self['training_set_kwargs']['hparams']['label_dim']"
+  img_resolution: ">>> self['training_set_kwargs']['hparams']['resolution']"
+  img_channels: ">>> self['training_set_kwargs']['hparams']['num_img_channel']"
+  channel_base: ">>> self['from_args']['cbase']"
+  channel_max: ">>> self['from_args']['cmax']"
+  num_fp16_res: ">>> self['from_args']['d_num_fp16_res']"
+  conv_clamp: 256 #256 if cfg.from_args.d_num_fp16_res > 0 else None
+  disc_c_noise: 0.0 # Regularization for discriminator pose conditioning
+#  additional_kwargs:
+  block_kwargs:
+    freeze_layers: 0  #Freeze first layers of D
+  mapping_kwargs:
+    class_name: src.training.networks.networks_stylegan2.MappingNetwork
+    z_dim: 0
+    c_dim: ">>> self['D_kwargs']['c_dim']"
+    num_ws: null
+    w_avg_beta: null
+  epilogue_kwargs:
+    mbstd_group_size: 4
+
+D_opt_kwargs:
+  betas:
+  - 0
+  - 0.99
+  class_name: torch.optim.Adam
+  eps: 1.0e-08
+  lr: 0.002 # 0.002 #D learning rate
+
+G_opt_kwargs:
+  betas:
+  - 0
+  - 0.99
+  class_name: torch.optim.Adam
+  eps: 1.0e-08
+  lr: 0.0025 # 0.0025
+
+P_opt_kwargs:
+  lr: 0.00001
+
+#G_reg_interval: 4.0
+
+data_loader_kwargs:
+  num_workers: 3  #DataLoader worker processes
+  pin_memory: true
+  prefetch_factor: 2
+
+loss_kwargs:
+  blur_fade_kimg: ">>> self['batch_size'] * self['from_args']['blur_fade_kimg'] / 32" # Fade out the blur during the first N kimg.
+  blur_init_sigma: 10 # Blur the images seen by the discriminator.
+  class_name: src.training.losses.loss_Dr3D.StyleGAN2Loss_Dr3D
+  dual_discrimination: true
+  filter_mode: antialiased  # Filter mode for raw images ['antialiased', 'none', float [0-1]]
+  gpc_reg_fade_kimg: 1000 #Length of swapping prob fade
+  #gpc_reg_prob: 0.5
+  neural_rendering_resolution_fade_kimg: 1000 #Kimg to blend resolution over
+  neural_rendering_resolution_final: null #Final resolution to render at, if blending
+  neural_rendering_resolution_initial: ">>> self['from_args']['img_resolution_mid']" #Resolution to render at
+  r1_gamma: ">>> self['from_args']['gamma']"   #R1 regularization weight
+  style_mixing_prob: 0.0  #Style-mixing regularization probability for training
+  additional_kwargs:
+    depth_reg: 3.0
+    normal_reg: 1.0
+    pose_reg: 10.0
+    depth_mode: L1
+    k_std: 3
+    near: ">>> self['G_kwargs']['rendering_kwargs']['ray_start']"
+    far: ">>> self['G_kwargs']['rendering_kwargs']['ray_end']"
+    normal_scale: 100
+
+augment_kwargs:
+  class_name: src.training.augment.AugmentPipe
+  xflip: 0
+  rotate90: 0
+  xint: 1
+  scale: 1
+  rotate: 0
+  aniso: 1
+  xfrac: 1
+  brightness: 1
+  contrast: 1
+  lumaflip: 1
+  hue: 0
+  saturation: 0
+  imgfilter: 1
+  noise: 1
+  cutout: 1
+  ada_target: 0.6
+  ada_interval: 4
+  ada_kimg: 500
+  augment_p: 0
+
+metrics:  #Quality metrics
+- fid50k_full
