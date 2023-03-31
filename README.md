@@ -56,7 +56,7 @@ Before training Dr.3D, check configurations and datasets.
 We use wandb for logging and presenting result images. 
 * Please make sure to login wandb in your workspace.
 
-# Configurations
+### Configurations
 Before training, check configurations of
 * data: Dataset_path in your workspace.
 * dataset_name: Dataset name (anything you want).
@@ -64,7 +64,7 @@ Before training, check configurations of
 * resume: Path for the pretrained EG3D checkpoint (default: ./ckpts/EG3D_FFHQ_ckpt.pth)
 * posenet_path: Path for the pretrained pose-estimation network checkpoint (default: ./ckpts/hopenet_ckpt.pth)
 
-# Dataset Tree
+### Dataset Tree
 Dr3D does not need any labeled poses. Place images in the dataset on the dataset path ('data' in the configuration file.)
 Structures of the files are as follows (Dr.3D can handle both structures),
 
@@ -113,7 +113,7 @@ python invert.py --cfg_path ./configs/inversion/your_own_config.yaml
 * Thanks for publicly sharing datasets of Anime ([StyleAnime](https://github.com/zsl2018/StyleAnime)) and Webtoon ([Naver-Webtoon dataset](https://github.com/zsl2018/StyleAnime)) styles.
 
 
-# References
+## References
 1. [Efficient Geometry-aware 3D Generative Adversarial Networks (EG3D)](https://arxiv.org/abs/2112.07945), Chan et al. 2022
 2. [Pivotal Tuning for Latent-based Editing of Real Images](https://arxiv.org/abs/2106.05744), Roich et al. 2022 
 3. [Fine-Grained Head Pose Estimation Without Keypoints](https://arxiv.org/abs/1710.00925), Ruiz et al. 2018
