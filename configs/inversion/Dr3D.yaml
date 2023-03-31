@@ -1,10 +1,10 @@
 from_args:
-  dataset_name: caricatures
+  dataset_name: Caricatures
   network_name: Dr3D_Caricature
   outdir: ./logs/invert_samples
-  network_dir: /data/private/Dr3D/Dr3D/logs/Dr3D_final/Caricature
-  network_pkl: network-snapshot-000403.pkl
-  target_image_path: /data/private/Dr3D/Dr3D/target_images/
+  network_dir: ./pretrained/Caricature
+  network_pkl: Caricature.pkl
+  target_image_path: ../target_images/
   reload_modules: True
   shapes: True
   shape_res: 512
