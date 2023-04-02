@@ -13,14 +13,14 @@ coach_kwargs:
   inverter_kwargs:
     lpips_type: vgg
     max_images_to_invert: 10
-    max_pti_steps: 10
+    max_pti_steps: 400
     use_ball_holder: True
     use_locality_regularization: True
     locality_regularization_interval: 1
     training_step: 1
     pti_learning_rate: 3.0e-04
   proj_kwargs:
-    first_inv_steps: 10
+    first_inv_steps: 400
     first_inv_lr: 5.0e-03
   reg_kwargs:
     regularizer_alpha: 30
